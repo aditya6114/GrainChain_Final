@@ -85,3 +85,20 @@ MIT
 ## Credits
 - Built by [Your Name/Team].
 - Uses OpenStreetMap, React, Next.js, Supabase, and more. 
+
+## Database Migration: Add Latitude and Longitude to Donations Table
+
+To display donation locations on the map, update your `donations` table to include `latitude` and `longitude` columns:
+
+```sql
+ALTER TABLE public.donations
+ADD COLUMN latitude double precision,
+ADD COLUMN longitude double precision;
+```
+
+- `latitude` and `longitude` should be of type `double precision` to store coordinates.
+- After running this migration, new donations can store their location for use in the map page (e.g., with Leaflet).
+
+---
+
+**If you use a migration tool or have a migrations folder, add this migration there as well.** 

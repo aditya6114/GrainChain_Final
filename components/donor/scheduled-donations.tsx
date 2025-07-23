@@ -6,12 +6,26 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, MapPin, MoreHorizontal } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Card, CardContent } from "@/components/ui/card"
-import { fetchDonations } from '@/lib/datafetching'
+import { fetchDonations, deleteDonation } from '@/lib/datafetching'
 
 export default function ScheduledDonations() {
   const [donations, setDonations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cancellingId, setCancellingId] = useState<number | null>(null)
+
+  const handleCancel = async (id: number) => {
+    if (!window.confirm('Are you sure you want to cancel this donation?')) return;
+    setCancellingId(id)
+    try {
+      await deleteDonation(id)
+      setDonations((prev) => prev.filter((d) => d.id !== id))
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel donation')
+    } finally {
+      setCancellingId(null)
+    }
+  }
 
   useEffect(() => {
     async function loadDonations() {
@@ -49,7 +63,9 @@ export default function ScheduledDonations() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem>Reschedule</DropdownMenuItem>
-                      <DropdownMenuItem>Cancel</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleCancel(donation.id)} disabled={cancellingId === donation.id}>
+                        {cancellingId === donation.id ? 'Cancelling...' : 'Cancel'}
+                      </DropdownMenuItem>
                       <DropdownMenuItem>Contact Recipient</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -79,8 +95,8 @@ export default function ScheduledDonations() {
                 <Button variant="outline" size="sm">
                   Reschedule
                 </Button>
-                <Button variant="outline" size="sm">
-                  Cancel
+                <Button variant="outline" size="sm" onClick={() => handleCancel(donation.id)} disabled={cancellingId === donation.id}>
+                  {cancellingId === donation.id ? 'Cancelling...' : 'Cancel'}
                 </Button>
                 <Button variant="outline" size="sm">
                   Contact Recipient

@@ -195,6 +195,10 @@ export default function AvailableFoodListings() {
                   <span className="font-medium">Category:</span>&nbsp;{donation.category}
                 </div>
                 <div className="flex items-center text-sm text-muted-foreground mb-1">
+                  <MapPin className="h-4 w-4 mr-1" />
+                  {donation.location || (donation.latitude && donation.longitude ? `Lat: ${donation.latitude}, Lon: ${donation.longitude}` : "No location provided")}
+                </div>
+                <div className="flex items-center text-sm text-muted-foreground mb-1">
                   <Clock className="h-4 w-4 mr-1" />
                   <span>Expires: {donation.expiry_date}</span>
                 </div>

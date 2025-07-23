@@ -48,3 +48,13 @@ export async function fetchDonations() {
   if (error) throw error;
   return data;
 }
+
+export async function deleteDonation(id: number) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('donations')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+  return true;
+}

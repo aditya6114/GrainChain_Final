@@ -187,7 +187,7 @@ export default function DonationForm() {
               />
               {locationLoading && <div className="text-xs text-muted-foreground">Loading suggestions...</div>}
               {locationSuggestions.length > 0 && (
-                <div className="border rounded-md bg-white shadow-md max-h-48 overflow-y-auto z-10 relative">
+                <div className="border rounded-md  shadow-md max-h-48 overflow-y-auto z-10 relative">
                   {locationSuggestions.map((suggestion: any) => (
                     <div
                       key={suggestion.place_id}
