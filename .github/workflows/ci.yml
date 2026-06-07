@@ -39,7 +39,7 @@ jobs:
       # If the lockfile hasn't changed, deps are restored from cache (~5s vs ~30s)
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -80,7 +80,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
 
