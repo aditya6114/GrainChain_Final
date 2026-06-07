@@ -27,9 +27,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+<<<<<<< HEAD
 
 # backend
 backend/node_modules/
 backend/dist/
 backend/.env
 backend/.env.*
+=======
+/lib/generated/prisma
+>>>>>>> 2378217a1e7df370738ad941e8b3afad32c4b971
