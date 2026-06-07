@@ -1,76 +1,147 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { getUser, authApi, volunteerApi } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import VolunteerSignup from "@/components/volunteer/volunteer-signup"
-import TaskListings from "@/components/volunteer/task-listings"
-import TaskProgress from "@/components/volunteer/task-progress"
-// import Leaderboard from "@/components/volunteer/leaderboard"
+import { Badge } from "@/components/ui/badge"
 
 export default function VolunteerPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+
+  const [available, setAvailable] = useState<any[]>([])
+  const [myTasks, setMyTasks] = useState<any[]>([])
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const u = getUser()
+    if (!u || u.role !== "volunteer") { router.push("/auth/login"); return }
+    setUser(u)
+    loadAvailable()
+  }, [router])
+
+  async function loadAvailable() {
+    setError("")
+    setLoading(true)
+    try {
+      const data = await volunteerApi.getAvailableTasks()
+      setAvailable(data)
+    } catch (err: any) {
+      setError(err.message || "Failed to load tasks")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadMyTasks() {
+    setError("")
+    setLoading(true)
+    try {
+      const data = await volunteerApi.getMyTasks()
+      setMyTasks(data)
+    } catch (err: any) {
+      setError(err.message || "Failed to load tasks")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handlePickup(taskId: string) {
+    try {
+      await volunteerApi.pickup(taskId)
+      loadAvailable()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  async function handleDeliver(taskId: string) {
+    try {
+      await volunteerApi.deliver(taskId)
+      loadMyTasks()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  function handleLogout() {
+    authApi.logout()
+    router.push("/auth/login")
+  }
+
+  if (!user) return null
+
   return (
-    <div className="container py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Volunteer Portal</h1>
-        <p className="text-muted-foreground">
-          Join our volunteer network to help transport food from donors to recipients.
-        </p>
+    <div className="min-h-screen bg-background">
+      <nav className="bg-[#1E3D2F] text-white px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <span className="text-xl font-bold">GrainChain</span>
+          <span className="text-sm opacity-80">Volunteer Dashboard</span>
+        </div>
+        <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/10" onClick={handleLogout}>Logout</Button>
+      </nav>
+
+      <div className="max-w-3xl mx-auto p-6">
+        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+
+        <Tabs defaultValue="available" onValueChange={(v) => { if (v === "mytasks") loadMyTasks() }}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="available">Available Tasks</TabsTrigger>
+            <TabsTrigger value="mytasks">My Tasks</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="available">
+            {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+            <div className="space-y-3">
+              {available.map((t: any) => (
+                <Card key={t.id}>
+                  <CardContent className="pt-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Task {t.id?.slice(0, 8)}...</p>
+                      <p className="text-sm text-muted-foreground">Claim: {t.claim_id?.slice(0, 8)}...</p>
+                      <p className="text-xs text-muted-foreground">Created: {new Date(t.created_at).toLocaleString()}</p>
+                      <Badge variant="secondary" className="mt-1">{t.status}</Badge>
+                    </div>
+                    <Button size="sm" className="bg-[#C8603A] hover:bg-[#b0502e] text-white" onClick={() => handlePickup(t.id)}>Pick Up</Button>
+                  </CardContent>
+                </Card>
+              ))}
+              {available.length === 0 && !loading && (
+                <p className="text-center text-muted-foreground py-8">No available tasks right now.</p>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="mytasks">
+            {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+            <div className="space-y-3">
+              {myTasks.map((t: any) => (
+                <Card key={t.id}>
+                  <CardContent className="pt-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Task {t.id?.slice(0, 8)}...</p>
+                      <Badge variant={t.status === "delivered" ? "default" : "secondary"} className="mt-1">{t.status}</Badge>
+                      {t.delivered_at && (
+                        <p className="text-xs text-muted-foreground mt-1">Delivered: {new Date(t.delivered_at).toLocaleString()}</p>
+                      )}
+                    </div>
+                    {t.status === "in_progress" && (
+                      <Button size="sm" className="bg-[#1E3D2F] hover:bg-[#2a5740] text-white" onClick={() => handleDeliver(t.id)}>Mark Delivered</Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+              {myTasks.length === 0 && !loading && (
+                <p className="text-center text-muted-foreground py-8">No tasks assigned yet.</p>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <Tabs defaultValue="signup" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="signup">Sign Up</TabsTrigger>
-          <TabsTrigger value="tasks">Available Tasks</TabsTrigger>
-          <TabsTrigger value="progress">Task Progress</TabsTrigger>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="signup" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Volunteer Registration</CardTitle>
-              <CardDescription>Sign up to become a volunteer and help deliver food to those in need.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <VolunteerSignup />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tasks" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Tasks</CardTitle>
-              <CardDescription>Browse and claim food pickup and delivery tasks in your area.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TaskListings />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="progress" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Task Progress</CardTitle>
-              <CardDescription>Track your assigned, ongoing, and completed tasks.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TaskProgress />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="leaderboard" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Volunteer Leaderboard</CardTitle>
-              <CardDescription>See top volunteers and your contribution rankings.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* <Leaderboard /> */}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }

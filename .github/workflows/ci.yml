@@ -1,0 +1,100 @@
+# ================================================================
+# GrainChain CI Pipeline
+# ================================================================
+# Runs on every push and pull request.
+# Two parallel jobs: backend (type-check + tests + Docker build)
+# and frontend (Next.js build + Docker build).
+#
+# WHY CI?
+# Without CI, broken code can land in main — you only discover it
+# when you try to deploy or when another developer pulls and crashes.
+# CI catches it immediately: failed tests block the merge.
+# ================================================================
+
+name: CI
+
+# When does this run?
+on:
+  push:
+    branches: [main]       # Every push to main
+  pull_request:
+    branches: [main]       # Every PR targeting main
+
+# ── BACKEND JOB ──────────────────────────────────────────────────
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest    # GitHub provides free Linux VMs for public repos
+    defaults:
+      run:
+        working-directory: backend   # All commands run from backend/
+
+    steps:
+      # Step 1: Check out the code
+      # Without this, the VM is empty — it needs to clone your repo
+      - uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js with caching
+      # actions/setup-node can cache node_modules based on package-lock.json
+      # If the lockfile hasn't changed, deps are restored from cache (~5s vs ~30s)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # Step 3: Install dependencies
+      # npm ci (not npm install) — deterministic, lockfile-based, fails if lockfile is stale
+      - name: Install dependencies
+        run: npm ci
+
+      # Step 4: Type-check
+      # Catches type errors that might not surface at runtime
+      # (e.g., wrong argument types, missing properties)
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      # Step 5: Run tests
+      # Our 28 unit tests validate business logic:
+      #   - Urgency calculation (6 tests)
+      #   - Claim lifecycle (16 tests)
+      #   - Volunteer task lifecycle (7 tests)
+      - name: Run tests
+        run: npm test
+
+      # Step 6: Verify Docker image builds
+      # Doesn't push the image anywhere — just confirms the Dockerfile
+      # produces a valid image. Catches issues like missing files,
+      # broken COPY commands, or build failures.
+      - name: Build Docker image
+        run: docker build -t grainchain-backend:ci .
+
+  # ── FRONTEND JOB ─────────────────────────────────────────────────
+  # Runs in parallel with backend (no depends_on)
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # --legacy-peer-deps because some shadcn/radix packages
+      # have peer dependency conflicts with React 19
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      # Next.js build compiles all pages, catches import errors,
+      # validates TypeScript (even with ignoreBuildErrors, missing
+      # files and broken imports still fail the build)
+      - name: Build Next.js
+        run: npm run build
+
+      # Verify the frontend Docker image builds correctly
+      - name: Build Docker image
+        run: docker build -t grainchain-frontend:ci .

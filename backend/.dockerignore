@@ -1,0 +1,27 @@
+# Dependencies — installed fresh inside the container
+node_modules
+
+# Build output — generated fresh inside the container
+dist
+
+# Environment files — NEVER bake secrets into images
+# They're injected at runtime via docker-compose or K8s secrets
+.env
+.env.*
+
+# Dev/test files — not needed in production
+src/__tests__
+jest.config.js
+*.test.ts
+*.spec.ts
+
+# Editor/OS files
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker files don't need to be in the build context
+Dockerfile
+.dockerignore

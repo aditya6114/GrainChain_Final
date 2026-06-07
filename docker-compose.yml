@@ -1,0 +1,52 @@
+# ================================================================
+# GrainChain — Docker Compose
+# ================================================================
+# Runs both services (backend + frontend) as containers.
+# Database (Supabase) and Redis (Upstash) are cloud-hosted,
+# so they're not defined here — just referenced via env vars.
+#
+# Usage:
+#   docker compose up --build        # build + start both services
+#   docker compose up -d             # start in background (detached)
+#   docker compose logs -f backend   # tail backend logs
+#   docker compose down              # stop and remove containers
+# ================================================================
+
+services:
+  # ── Backend (Express API) ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend           # Dockerfile is at backend/Dockerfile
+    ports:
+      - "4000:4000"                # host:container — access API at localhost:4000
+    env_file:
+      - ./backend/.env             # loads all env vars from the file
+    environment:
+      - NODE_ENV=production
+    # Health check: hit the /health endpoint every 30s
+    # Docker marks the container as "unhealthy" if it fails 3 times
+    # Useful for orchestrators (K8s, ECS) that auto-restart unhealthy containers
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s            # grace period for startup before checking
+    restart: unless-stopped        # auto-restart on crash, but not if manually stopped
+
+  # ── Frontend (Next.js) ────────────────────────────────────────
+  frontend:
+    build:
+      context: .                   # Dockerfile is at root
+    ports:
+      - "3000:3000"                # access UI at localhost:3000
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0           # Next.js standalone needs this to listen on all interfaces
+    # Frontend depends on backend being healthy before starting.
+    # Without this, the frontend might boot and try to call the API
+    # before Express is ready — users would see errors on first load.
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
