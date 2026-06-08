@@ -18,7 +18,7 @@
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.454.0",
-    "next": "15.2.4",
+    "next": "^15.5.19",
     "react": "^19",
     "react-dom": "^19",
     "react-leaflet": "^5.0.0",
