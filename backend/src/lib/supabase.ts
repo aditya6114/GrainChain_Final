@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import ws from 'ws'
 import { env } from '../types/env.schema'
 
 // We have TWO Supabase clients with different permission levels.
@@ -20,7 +21,10 @@ export const supabaseAdmin = createClient(
   {
     auth: {
       autoRefreshToken: false,
-      persistSession: false,  // server-side: no session persistence needed
+      persistSession: false,
+    },
+    realtime: {
+      transport: ws as any,  // Node 20 lacks native WebSocket — provide ws package
     },
   },
 )
@@ -39,6 +43,9 @@ export const supabaseAuth = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    realtime: {
+      transport: ws as any,
     },
   },
 )
