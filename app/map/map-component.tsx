@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet"
+import { useEffect, useMemo } from "react"
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
+import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { claimsApi } from "@/lib/api"
 import type { Donation } from "./page"
@@ -11,6 +12,30 @@ const URGENCY_COLORS: Record<string, string> = {
   high: "#EA580C",
   medium: "#D97706",
   low: "#16A34A",
+}
+
+// ── Pin-style markers ─────────────────────────────────────────
+// Leaflet's default Marker icons break under bundlers like webpack/Next.js
+// (the PNG paths resolve wrong), so instead of patching asset paths we use
+// L.divIcon with an inline SVG. Bonus: we can color each pin by urgency
+// without shipping one image per color.
+//
+// iconAnchor [14, 38] = the pin's TIP (bottom-center of a 28x38 SVG) sits
+// exactly on the donation's coordinates — not the image's top-left corner.
+function pinIcon(urgency: string) {
+  const color = URGENCY_COLORS[urgency] || "#6B7280"
+  return L.divIcon({
+    className: "", // suppress Leaflet's default white-square styling
+    html: `
+      <svg width="28" height="38" viewBox="0 0 28 38" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 24 14 24s14-13.5 14-24C28 6.27 21.73 0 14 0z"
+              fill="${color}" stroke="white" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="5.5" fill="white"/>
+      </svg>`,
+    iconSize: [28, 38],
+    iconAnchor: [14, 38],
+    popupAnchor: [0, -34],
+  })
 }
 
 // Sub-component to re-center the map when lat/lng props change
@@ -30,6 +55,18 @@ interface Props {
 }
 
 export default function MapComponentInner({ lat, lng, donations, user }: Props) {
+  // Build one icon per urgency level instead of one per marker —
+  // 200 donations share 4 icon objects rather than creating 200.
+  const icons = useMemo(
+    () => ({
+      critical: pinIcon("critical"),
+      high: pinIcon("high"),
+      medium: pinIcon("medium"),
+      low: pinIcon("low"),
+    }),
+    [],
+  )
+
   const handleClaim = async (donationId: string) => {
     try {
       await claimsApi.create(donationId)
@@ -54,19 +91,21 @@ export default function MapComponentInner({ lat, lng, donations, user }: Props) 
         <RecenterMap lat={lat} lng={lng} />
 
         {donations.map((d) => (
-          <CircleMarker
+          <Marker
             key={d.id}
-            center={[d.lat, d.lng]}
-            radius={10}
-            pathOptions={{
-              color: URGENCY_COLORS[d.urgency] || "#6B7280",
-              fillColor: URGENCY_COLORS[d.urgency] || "#6B7280",
-              fillOpacity: 0.7,
-              weight: 2,
-            }}
+            position={[d.lat, d.lng]}
+            icon={icons[d.urgency] || icons.medium}
           >
             <Popup maxWidth={280}>
               <div className="text-sm leading-relaxed">
+                {d.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={d.image_url}
+                    alt={d.title}
+                    className="w-full h-32 object-cover rounded-md mb-2"
+                  />
+                )}
                 <p className="font-bold text-base mb-1">{d.title}</p>
                 <p>
                   {d.food_type} &mdash; {d.quantity} {d.quantity_unit}
@@ -94,7 +133,7 @@ export default function MapComponentInner({ lat, lng, donations, user }: Props) 
                 )}
               </div>
             </Popup>
-          </CircleMarker>
+          </Marker>
         ))}
       </MapContainer>
 

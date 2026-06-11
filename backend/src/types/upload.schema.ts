@@ -17,8 +17,12 @@ export const RequestUploadSchema = z.object({
   contentType: z.enum(ALLOWED_TYPES, {
     errorMap: () => ({ message: `Allowed types: ${ALLOWED_TYPES.join(', ')}` }),
   }),
-  // Which donation this image is for (so we can organize files in R2)
-  donationId: z.string().uuid(),
+  // Which donation this image is for (so we can organize files in R2).
+  // Optional because the upload happens BEFORE the donation is created:
+  // the donor picks a photo, we upload it, then send image_url with the
+  // create-donation request. Without a donationId, files are scoped to
+  // the uploading user instead.
+  donationId: z.string().uuid().optional(),
 })
 
 export type RequestUploadInput = z.infer<typeof RequestUploadSchema>

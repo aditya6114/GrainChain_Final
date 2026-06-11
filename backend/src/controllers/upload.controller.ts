@@ -15,10 +15,16 @@ export const uploadController = {
       const { fileName, contentType, donationId } = req.body as RequestUploadInput
       const userId = req.user!.id
 
-      // Build the R2 key: donations/<donationId>/<uuid>.<ext>
-      // Organized by donation so cleanup is easy (delete donation = delete folder)
+      // Build the R2 key:
+      //   donations/<donationId>/<uuid>.<ext>  — when attached to an existing donation
+      //   uploads/<userId>/<uuid>.<ext>        — pre-creation upload (donor picks photo
+      //                                          before the donation row exists)
+      // The uuid segment makes every key unpredictable, so one user can never
+      // overwrite another's file even inside the same folder.
       const ext = fileName.split('.').pop() || 'jpg'
-      const key = `donations/${donationId}/${uuid()}.${ext}`
+      const key = donationId
+        ? `donations/${donationId}/${uuid()}.${ext}`
+        : `uploads/${userId}/${uuid()}.${ext}`
 
       const result = await getUploadUrl(key, contentType)
 

@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getUser, authApi, donationsApi, claimsApi } from "@/lib/api"
+import { useRealtimeDonations, distanceKm } from "@/lib/useRealtimeDonations"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -41,6 +42,31 @@ export default function RecipientPage() {
     setUser(u)
   }, [router])
 
+  // Refs so the realtime callbacks (created once) always see current values.
+  // hasSearched gates the feed — appending results before the user searches
+  // would be confusing ("where did this list come from?").
+  const searchRef = useRef({ lat: Number(lat), lng: Number(lng), radius: Number(radius) })
+  searchRef.current = { lat: Number(lat), lng: Number(lng), radius: Number(radius) }
+  const hasSearchedRef = useRef(false)
+
+  // ── Live feed: new donations appear at the top of results instantly ──
+  useRealtimeDonations({
+    onInsert: (d) => {
+      if (!hasSearchedRef.current) return
+      if (d.status !== "available" || d.lat == null || d.lng == null) return
+      const { lat: cLat, lng: cLng, radius: cRadius } = searchRef.current
+      if (distanceKm(cLat, cLng, d.lat, d.lng) > cRadius) return
+      setDonations((prev) => (prev.some((x) => x.id === d.id) ? prev : [d, ...prev]))
+    },
+    onUpdate: (d) => {
+      setDonations((prev) =>
+        d.status !== "available"
+          ? prev.filter((x) => x.id !== d.id)
+          : prev.map((x) => (x.id === d.id ? { ...x, ...d } : x)),
+      )
+    },
+  })
+
   async function handleSearch() {
     setBrowseErr("")
     setClaimMsg("")
@@ -48,6 +74,7 @@ export default function RecipientPage() {
     try {
       const data = await donationsApi.getNearby(Number(lat), Number(lng), Number(radius))
       setDonations(data)
+      hasSearchedRef.current = true
     } catch (err: any) {
       setBrowseErr(err.message || "Search failed")
     } finally {
@@ -142,8 +169,12 @@ export default function RecipientPage() {
               {donations.map((d: any) => (
                 <Card key={d.id}>
                   <CardContent className="pt-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
+                    <div className="flex justify-between items-start gap-3">
+                      {d.image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={d.image_url} alt={d.title} className="h-20 w-20 object-cover rounded-md border shrink-0" />
+                      )}
+                      <div className="space-y-1 flex-1">
                         <h3 className="font-semibold text-lg">{d.title}</h3>
                         <p className="text-sm text-muted-foreground">{d.food_type} — {d.quantity} {d.quantity_unit}</p>
                         {d.location_text && <p className="text-sm text-muted-foreground">{d.location_text}</p>}

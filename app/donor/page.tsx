@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { getUser, authApi, donationsApi, claimsApi } from "@/lib/api"
+import { getUser, authApi, donationsApi, claimsApi, uploadsApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -29,6 +29,12 @@ export default function DonorPage() {
   const [createErr, setCreateErr] = useState("")
   const [creating, setCreating] = useState(false)
 
+  // Photo upload state
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadStep, setUploadStep] = useState("")  // progress text shown during submit
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Claims lookup state
   const [donationId, setDonationId] = useState("")
   const [claims, setClaims] = useState<any[]>([])
@@ -41,12 +47,41 @@ export default function DonorPage() {
     setUser(u)
   }, [router])
 
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) { setImageFile(null); setImagePreview(null); return }
+    if (file.size > 5 * 1024 * 1024) {
+      setCreateErr("Image must be under 5MB")
+      e.target.value = ""
+      return
+    }
+    setCreateErr("")
+    setImageFile(file)
+    // Object URL is a lightweight in-browser pointer to the file —
+    // cheaper than base64-encoding the whole image for preview
+    setImagePreview(URL.createObjectURL(file))
+  }
+
   async function handleCreateDonation(e: React.FormEvent) {
     e.preventDefault()
     setCreateMsg("")
     setCreateErr("")
     setCreating(true)
     try {
+      // If a photo was selected, upload it BEFORE creating the donation:
+      //   1. Ask our backend for a presigned R2 URL (auth-checked)
+      //   2. PUT the file directly to Cloudflare R2 — bypasses our server,
+      //      so a 5MB photo never consumes backend bandwidth/memory
+      //   3. Attach the permanent public URL to the donation record
+      let imageUrl: string | undefined
+      if (imageFile) {
+        setUploadStep("Uploading photo...")
+        const { uploadUrl, fileUrl } = await uploadsApi.requestUploadUrl(imageFile.name, imageFile.type)
+        await uploadsApi.uploadFile(uploadUrl, imageFile)
+        imageUrl = fileUrl
+      }
+
+      setUploadStep("Creating donation...")
       await donationsApi.create({
         title,
         description: description || undefined,
@@ -57,13 +92,17 @@ export default function DonorPage() {
         lat: Number(lat),
         lng: Number(lng),
         location_text: locationText,
+        image_url: imageUrl,
       })
       setCreateMsg("Donation created successfully!")
       setTitle(""); setDescription(""); setFoodType(""); setQuantity(""); setQuantityUnit(""); setExpiryTime(""); setLocationText("")
+      setImageFile(null); setImagePreview(null)
+      if (fileInputRef.current) fileInputRef.current.value = ""
     } catch (err: any) {
       setCreateErr(err.message || "Failed to create donation")
     } finally {
       setCreating(false)
+      setUploadStep("")
     }
   }
 
@@ -179,6 +218,20 @@ export default function DonorPage() {
                     <Label htmlFor="loc">Location</Label>
                     <Input id="loc" required value={locationText} onChange={(e) => setLocationText(e.target.value)} placeholder="e.g. VIT Chennai Main Gate" />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="photo">Photo (optional)</Label>
+                    <Input id="photo" ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={handleImageSelect} />
+                    {imagePreview && (
+                      <div className="flex items-center gap-3 mt-1">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imagePreview} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
+                        <Button type="button" variant="outline" size="sm" onClick={() => {
+                          setImageFile(null); setImagePreview(null)
+                          if (fileInputRef.current) fileInputRef.current.value = ""
+                        }}>Remove</Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="lat">Latitude</Label>
@@ -192,7 +245,7 @@ export default function DonorPage() {
                   {createMsg && <p className="text-sm text-green-700 font-medium">{createMsg}</p>}
                   {createErr && <p className="text-sm text-red-600">{createErr}</p>}
                   <Button type="submit" disabled={creating} className="w-full bg-[#1E3D2F] hover:bg-[#2a5740] text-white">
-                    {creating ? "Creating..." : "Create Donation"}
+                    {creating ? (uploadStep || "Creating...") : "Create Donation"}
                   </Button>
                 </form>
               </CardContent>

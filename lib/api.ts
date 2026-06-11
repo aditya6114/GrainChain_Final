@@ -104,6 +104,7 @@ export const donationsApi = {
     lat: number
     lng: number
     location_text: string
+    image_url?: string
   }) {
     const data = await apiFetch<{ success: boolean; data: any }>('/api/donations', {
       method: 'POST',
@@ -168,15 +169,17 @@ export const claimsApi = {
 // ── Uploads API ─────────────────────────────────────────────
 
 export const uploadsApi = {
-  // Step 1: Ask backend for a presigned upload URL
-  async requestUploadUrl(donationId: string, fileName: string, contentType: string) {
+  // Step 1: Ask backend for a presigned upload URL.
+  // donationId is optional — for donation photos we upload BEFORE the
+  // donation exists, then pass the resulting fileUrl as image_url on create.
+  async requestUploadUrl(fileName: string, contentType: string, donationId?: string) {
     const data = await apiFetch<{
       uploadUrl: string    // PUT the file here (direct to R2)
       fileUrl: string      // permanent public URL after upload
       key: string          // R2 object key
     }>('/api/uploads/request', {
       method: 'POST',
-      body: JSON.stringify({ donationId, fileName, contentType }),
+      body: JSON.stringify({ fileName, contentType, ...(donationId ? { donationId } : {}) }),
     })
     return data
   },

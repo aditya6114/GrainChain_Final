@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { donationsApi, getUser, clearToken } from "@/lib/api"
+import { useRealtimeDonations, distanceKm } from "@/lib/useRealtimeDonations"
 
 const MapComponent = dynamic(() => import("./map-component"), { ssr: false })
 
@@ -19,6 +20,7 @@ export interface Donation {
   lat: number
   lng: number
   location_text: string
+  image_url: string | null
   status: string
   expiry_time: string
 }
@@ -32,6 +34,42 @@ export default function MapPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [controlsOpen, setControlsOpen] = useState(false)
+  const [liveMsg, setLiveMsg] = useState<string | null>(null)
+
+  // The realtime callbacks below live inside a subscription that's created
+  // once, so they can't read lat/lng/radius from state directly (they'd see
+  // stale values from the first render). A ref always holds the current
+  // search params without re-creating the WebSocket subscription.
+  const searchRef = useRef({ lat, lng, radius })
+  searchRef.current = { lat, lng, radius }
+
+  // ── Live feed ───────────────────────────────────────────────
+  // New donations appear on the map the moment a donor creates them —
+  // no refresh, no polling. Supabase Realtime pushes the row over WebSocket.
+  useRealtimeDonations({
+    onInsert: (d) => {
+      // Only show donations that are claimable and within the current search area
+      if (d.status !== "available" || d.lat == null || d.lng == null) return
+      const { lat: cLat, lng: cLng, radius: cRadius } = searchRef.current
+      if (distanceKm(cLat, cLng, d.lat, d.lng) > cRadius) return
+
+      setDonations((prev) =>
+        prev.some((x) => x.id === d.id) ? prev : [...prev, d as Donation],
+      )
+      setLiveMsg(`New donation nearby: ${d.title}`)
+      setTimeout(() => setLiveMsg(null), 5000)
+    },
+    onUpdate: (d) => {
+      // A donation that got claimed/expired should vanish from the map;
+      // one that's still available gets refreshed in place (e.g. AI
+      // enrichment just filled in urgency + summary)
+      setDonations((prev) =>
+        d.status !== "available"
+          ? prev.filter((x) => x.id !== d.id)
+          : prev.map((x) => (x.id === d.id ? ({ ...x, ...d } as Donation) : x)),
+      )
+    },
+  })
 
   // Fetch donations for the current lat/lng/radius
   const fetchDonations = useCallback(async (fetchLat: number, fetchLng: number, fetchRadius: number) => {
@@ -154,7 +192,22 @@ export default function MapPage() {
           } md:translate-x-0 absolute md:relative z-[999] w-72 p-4 flex flex-col gap-4 overflow-y-auto transition-transform duration-200 shrink-0`}
           style={{ backgroundColor: "#F5F0E8", height: "100%" }}
         >
-          <h2 className="font-bold text-lg mt-10 md:mt-0">Find Donations</h2>
+          <div className="flex items-center justify-between mt-10 md:mt-0">
+            <h2 className="font-bold text-lg">Find Donations</h2>
+            <span className="flex items-center gap-1.5 text-xs font-medium text-green-700">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-600" />
+              </span>
+              Live
+            </span>
+          </div>
+
+          {liveMsg && (
+            <p className="text-sm text-green-800 bg-green-100 border border-green-300 p-2 rounded animate-pulse">
+              {liveMsg}
+            </p>
+          )}
 
           <button
             onClick={handleUseMyLocation}
