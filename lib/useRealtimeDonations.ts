@@ -18,7 +18,7 @@
 // but private rows don't leak.
 
 import { useEffect, useRef } from 'react'
-import { supabase } from './supabaseClient'
+import { getSupabase } from './supabaseClient'
 
 export interface RealtimeDonationHandlers {
   // Fired when a new donation row is inserted
@@ -35,6 +35,10 @@ export function useRealtimeDonations(handlers: RealtimeDonationHandlers) {
   handlersRef.current = handlers
 
   useEffect(() => {
+    // getSupabase() is called inside useEffect, which only runs in the
+    // browser — so the client (and its env vars) are never touched during
+    // build-time prerendering.
+    const supabase = getSupabase()
     const channel = supabase
       .channel('donations-feed')
       .on(

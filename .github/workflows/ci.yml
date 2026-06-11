@@ -92,8 +92,18 @@ jobs:
       # Next.js build compiles all pages, catches import errors,
       # validates TypeScript (even with ignoreBuildErrors, missing
       # files and broken imports still fail the build)
+      # NEXT_PUBLIC_* env vars are inlined into the bundle at BUILD time.
+      # .env is gitignored, so CI must provide values or any code touching
+      # them during prerender crashes. Placeholders are fine here: this CI
+      # artifact is never deployed — Vercel runs its own build with real
+      # values from its dashboard. (These aren't secrets anyway: anything
+      # NEXT_PUBLIC_* ships to every browser.)
       - name: Build Next.js
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:4000
 
       # Verify the frontend Docker image builds correctly
       - name: Build Docker image
