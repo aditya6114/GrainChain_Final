@@ -39,7 +39,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-5 bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-[#1E3D2F]">Create Account</CardTitle>
@@ -81,6 +81,7 @@ export default function RegisterPage() {
           </p>
         </CardContent>
       </Card>
+      <Link href="/" className="text-sm text-muted-foreground hover:text-[#1E3D2F] hover:underline">← Back to home</Link>
     </div>
   )
 }

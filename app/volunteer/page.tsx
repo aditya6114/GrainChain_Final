@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { getUser, authApi, volunteerApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -79,10 +80,13 @@ export default function VolunteerPage() {
     <div className="min-h-screen bg-background">
       <nav className="bg-[#1E3D2F] text-white px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <span className="text-xl font-bold">GrainChain</span>
+          <Link href="/" className="text-xl font-bold hover:opacity-80">GrainChain</Link>
           <span className="text-sm opacity-80">Volunteer Dashboard</span>
         </div>
-        <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/10" onClick={handleLogout}>Logout</Button>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-sm hover:underline">Home</Link>
+          <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/10" onClick={handleLogout}>Logout</Button>
+        </div>
       </nav>
 
       <div className="max-w-3xl mx-auto p-6">
