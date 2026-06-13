@@ -1,0 +1,3 @@
+# Keeps the public/ directory present in git and the Docker build context.
+# Next.js and the Dockerfile expect public/ to exist (COPY public ./public).
+# Static assets (favicons, images, robots.txt) can live here.
